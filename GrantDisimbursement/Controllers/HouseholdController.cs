@@ -8,6 +8,7 @@ using System.Net.Http;
 using System.Web.Http;
 using System.Configuration;
 using System.Data;
+using GrantDisimbursement.Utilities;
 
 namespace GrantDisimbursement.Controllers
 {
@@ -108,7 +109,7 @@ namespace GrantDisimbursement.Controllers
 
                     while (dataReader.Read())
                     {
-                        var household = ReadHouseholdRow((IDataRecord)dataReader);
+                        var household = Helpers.ReadHouseholdRow((IDataRecord)dataReader);
                         if (tempID != household.ObjectID)
                         {
                             if (tempID != null)
@@ -121,7 +122,7 @@ namespace GrantDisimbursement.Controllers
                             householdEntityResponse.FamilyMembers = new List<Member>();
                             tempID = household.ObjectID.Value;
                         }
-                        var familyMember = ReadMemberRow((IDataRecord)dataReader, 3);
+                        var familyMember = Helpers.ReadMemberRow((IDataRecord)dataReader, 3);
                         householdEntityResponse.FamilyMembers.Add(familyMember);
                     }
                     // end of query result, add last result into list.
@@ -167,7 +168,7 @@ namespace GrantDisimbursement.Controllers
 
                     while (dataReader.Read())
                     {
-                        householdEntityResponse.Household = ReadHouseholdRow((IDataRecord)dataReader);
+                        householdEntityResponse.Household = Helpers.ReadHouseholdRow((IDataRecord)dataReader);
                     }
 
                     if (householdEntityResponse.Household == null)
@@ -196,7 +197,7 @@ namespace GrantDisimbursement.Controllers
                     householdEntityResponse.FamilyMembers = new List<Member>();
                     while (dataReader.Read())
                     {
-                        householdEntityResponse.FamilyMembers.Add(ReadMemberRow((IDataRecord)dataReader));
+                        householdEntityResponse.FamilyMembers.Add(Helpers.ReadMemberRow((IDataRecord)dataReader));
                     }
                 }
                 return Ok(householdEntityResponse);
@@ -207,41 +208,7 @@ namespace GrantDisimbursement.Controllers
             }
         }
 
-        private Household ReadHouseholdRow(IDataRecord record)
-        {
-            return new Household()
-            {
-                ObjectID = (Guid?)record[0],
-                HousingType = (string)record[1],
-                IsDeleted = (int?)record[2]
-            };
-        }
-
-        private Member ReadMemberRow(IDataRecord record, int offset = 0)
-        {
-            Member m = new Member();
-            m.ObjectID = record.GetGuid(0 + offset);
-            m.Name = record.GetString(1 + offset);
-            m.Gender = record.GetString(2 + offset);
-            m.MaritalStatus = record.GetString(3 + offset);
-
-            if (record.IsDBNull(4 + offset))
-                m.SpouseID = null;
-            else
-                m.SpouseID = record.GetGuid(4 + offset);
-
-            m.OccupationType = record.GetString(5 + offset);
-            m.AnnualIncome = record.GetDecimal(6 + offset);
-            m.DateOfBirth = record.GetDateTime(7 + offset);
-
-            if (record.IsDBNull(8 + offset))
-                m.HouseholdID = null;
-            else
-                m.HouseholdID = record.GetGuid(8 + offset);
-
-            m.IsDeleted = record.GetInt32(9 + offset);
-            return m;
-        }
+        
 
     }
 }
