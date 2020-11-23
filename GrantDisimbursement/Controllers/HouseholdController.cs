@@ -72,6 +72,71 @@ namespace GrantDisimbursement.Controllers
         }
 
         /// <summary>
+        /// Gets all household listings
+        /// </summary>
+        /// <returns></returns>
+        [HttpGet]
+        [Route("")]
+        public IHttpActionResult GetHouseHoldsListings()
+        {
+            try
+            {
+                // Return HouseholdListingResponse
+                List<HouseholdEntityResponse> householdEntityResponses = new List<HouseholdEntityResponse>();
+
+                HouseholdEntityResponse householdEntityResponse = new HouseholdEntityResponse();
+
+                SqlCommand command;
+                SqlDataReader dataReader;
+
+                string sql = @"SELECT H.[ObjectID], H.[HousingType], H.[IsDeleted],
+                            M.[ObjectID], M.[Name], M.[Gender],
+                            M.[MaritalStatus], M.[SpouseID], M.[OccupationType],
+                            M.[AnnualIncome], M.[DateOfBirth], M.[HouseholdID], M.[IsDeleted] 
+                           FROM Household H             
+                           LEFT JOIN Member M ON M.HouseholdID = H.ObjectID
+                           WHERE M.IsDELETED = 0 AND H.IsDeleted = 0 ORDER BY H.[ObjectID], M.[Name];
+                           ";
+
+                Guid? tempID = null;
+
+                using (SqlConnection c = new SqlConnection(ConfigurationManager.AppSettings["database"]))
+                {
+                    command = new SqlCommand(sql, c);
+                    c.Open();
+                    dataReader = command.ExecuteReader();
+
+                    while (dataReader.Read())
+                    {
+                        var household = ReadHouseholdRow((IDataRecord)dataReader);
+                        if (tempID != household.ObjectID)
+                        {
+                            if (tempID != null)
+                            {
+                                //add the householdentityResponse to list
+                                householdEntityResponses.Add(householdEntityResponse);
+                            }
+                            householdEntityResponse = new HouseholdEntityResponse();
+                            householdEntityResponse.Household = household;
+                            householdEntityResponse.FamilyMembers = new List<Member>();
+                            tempID = household.ObjectID.Value;
+                        }
+                        var familyMember = ReadMemberRow((IDataRecord)dataReader, 3);
+                        householdEntityResponse.FamilyMembers.Add(familyMember);
+                    }
+                    // end of query result, add last result into list.
+                    householdEntityResponses.Add(householdEntityResponse);
+                }
+                return Ok(householdEntityResponses);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest("Failed to get household listings.");
+            }
+        }
+
+
+        /// <summary>
         /// Retrieves a specific  household
         /// </summary>
         /// <param name="householdID">the identifier of the household</param>
@@ -80,36 +145,38 @@ namespace GrantDisimbursement.Controllers
         [Route("{householdID}")]
         public IHttpActionResult RetrieveHousehold(Guid? householdID)
         {
-            if (householdID == null)
-                return BadRequest("householdID must be specified");
-
-            // Return HouseholdListingResponse
-            HouseholdEntityResponse householdEntityResponse = new HouseholdEntityResponse();
-
-            SqlCommand command;
-            SqlDataReader dataReader;
-
-            string sql = @"SELECT ObjectID, HousingType, IsDeleted FROM Household WHERE IsDeleted = 0 and ObjectID = @ObjectID";
-
-            using (SqlConnection c = new SqlConnection(ConfigurationManager.AppSettings["database"]))
+            try
             {
-                command = new SqlCommand(sql, c);
-                command.Parameters.Add(new SqlParameter("@ObjectID", householdID));
-                c.Open();
-                dataReader = command.ExecuteReader();
+                if (householdID == null)
+                    return BadRequest("householdID must be specified");
 
-                while (dataReader.Read())
+                // Return HouseholdListingResponse
+                HouseholdEntityResponse householdEntityResponse = new HouseholdEntityResponse();
+
+                SqlCommand command;
+                SqlDataReader dataReader;
+
+                string sql = @"SELECT ObjectID, HousingType, IsDeleted FROM Household WHERE IsDeleted = 0 and ObjectID = @ObjectID";
+
+                using (SqlConnection c = new SqlConnection(ConfigurationManager.AppSettings["database"]))
                 {
-                    householdEntityResponse.Household = ReadHouseholdRow((IDataRecord)dataReader);
+                    command = new SqlCommand(sql, c);
+                    command.Parameters.Add(new SqlParameter("@ObjectID", householdID));
+                    c.Open();
+                    dataReader = command.ExecuteReader();
+
+                    while (dataReader.Read())
+                    {
+                        householdEntityResponse.Household = ReadHouseholdRow((IDataRecord)dataReader);
+                    }
+
+                    if (householdEntityResponse.Household == null)
+                        return Ok("Household does not exist");
                 }
 
-                if (householdEntityResponse.Household == null)
-                    return Ok("Household does not exist");
-            }
-
-            using (SqlConnection c = new SqlConnection(ConfigurationManager.AppSettings["database"]))
-            { 
-                sql = @"SELECT [ObjectID],
+                using (SqlConnection c = new SqlConnection(ConfigurationManager.AppSettings["database"]))
+                {
+                    sql = @"SELECT [ObjectID],
                     [Name],
                     [Gender],
                     [MaritalStatus],
@@ -121,18 +188,23 @@ namespace GrantDisimbursement.Controllers
                     [IsDeleted] FROM [Member] 
                     WHERE [IsDeleted] = 0 AND HouseholdID = @HouseholdID";
 
-                c.Open();
-                command = new SqlCommand(sql, c);
-                command.Parameters.Add(new SqlParameter("@HouseholdID", householdID));
+                    c.Open();
+                    command = new SqlCommand(sql, c);
+                    command.Parameters.Add(new SqlParameter("@HouseholdID", householdID));
 
-                dataReader = command.ExecuteReader();
-                householdEntityResponse.FamilyMembers = new List<Member>();
-                while (dataReader.Read())
-                {
-                    householdEntityResponse.FamilyMembers.Add(ReadMemberRow((IDataRecord)dataReader));
+                    dataReader = command.ExecuteReader();
+                    householdEntityResponse.FamilyMembers = new List<Member>();
+                    while (dataReader.Read())
+                    {
+                        householdEntityResponse.FamilyMembers.Add(ReadMemberRow((IDataRecord)dataReader));
+                    }
                 }
+                return Ok(householdEntityResponse);
             }
-            return Ok(householdEntityResponse);
+            catch(Exception ex)
+            {
+                return BadRequest("Failed to Retrieve single Household.");
+            }
         }
 
         private Household ReadHouseholdRow(IDataRecord record)
@@ -145,30 +217,31 @@ namespace GrantDisimbursement.Controllers
             };
         }
 
-        private Member ReadMemberRow(IDataRecord record)
+        private Member ReadMemberRow(IDataRecord record, int offset = 0)
         {
             Member m = new Member();
-            m.ObjectID = record.GetGuid(0);
-            m.Name = record.GetString(1);
-            m.Gender = record.GetString(2);
-            m.MaritalStatus = record.GetString(3);
+            m.ObjectID = record.GetGuid(0 + offset);
+            m.Name = record.GetString(1 + offset);
+            m.Gender = record.GetString(2 + offset);
+            m.MaritalStatus = record.GetString(3 + offset);
 
-            if (record.IsDBNull(4))
+            if (record.IsDBNull(4 + offset))
                 m.SpouseID = null;
             else
-                m.SpouseID = record.GetGuid(4);
+                m.SpouseID = record.GetGuid(4 + offset);
 
-            m.OccupationType = record.GetString(5);
-            m.AnnualIncome = record.GetDecimal(6);
-            m.DateOfBirth = record.GetDateTime(7);
+            m.OccupationType = record.GetString(5 + offset);
+            m.AnnualIncome = record.GetDecimal(6 + offset);
+            m.DateOfBirth = record.GetDateTime(7 + offset);
 
-            if (record.IsDBNull(8))
+            if (record.IsDBNull(8 + offset))
                 m.HouseholdID = null;
             else
-                m.HouseholdID = record.GetGuid(8);
+                m.HouseholdID = record.GetGuid(8 + offset);
 
-            m.IsDeleted = record.GetInt32(9);
+            m.IsDeleted = record.GetInt32(9 + offset);
             return m;
         }
+
     }
 }
