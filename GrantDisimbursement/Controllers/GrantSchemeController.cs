@@ -41,6 +41,25 @@ namespace GrantDisimbursement.Controllers
         {
             try
             {
+                string HOUSEHOLDSIZEGTE = householdsizegte == null ? "1=1" : $"COUNT(A.HouseholdID) >= {householdsizegte}";
+                string HOUSEHOLDSIZELTE = householdsizegte == null ? "1=1" : $"COUNT(A.HouseholdID) <= {householdsizelte}";
+                string TOTALINCOMEGTE = totalincomegte == null ? "1=1" : $"SUM(A.AnnualIncome) >= {totalincomegte}";
+                string TOTALINCOMELTE = totalincomelte == null ? "1=1" : $"SUM(A.AnnualIncome) <= {totalincomelte}";
+
+                string searchQuery;
+                if (householdsizegte == null && householdsizelte == null && totalincomegte == null && totalincomelte == null)
+                {
+                    searchQuery = String.Empty;
+                }
+                else
+                {
+                    searchQuery = $@"AND H.ObjectID IN (SELECT A.HouseholdID FROM [Member] A
+                                    WHERE A.IsDeleted = 0
+                                    GROUP BY A.HouseholdID
+                                    HAVING {TOTALINCOMEGTE} AND {TOTALINCOMELTE}
+                                    AND {HOUSEHOLDSIZEGTE} AND {HOUSEHOLDSIZELTE})";
+                }
+
                 string sql = String.Empty;
                 List<HouseholdEntityResponse> householdEntityResponses = new List<HouseholdEntityResponse>();
                 HouseholdEntityResponse householdEntityResponse = new HouseholdEntityResponse();
@@ -52,13 +71,14 @@ namespace GrantDisimbursement.Controllers
                     SELECT {SELECTORSNIPPET} FROM [Household] H 
                     LEFT JOIN [Member] M ON H.ObjectID = M.HouseholdID
                     WHERE DATEDIFF(year, M.DateOfBirth, GETDATE()) < {SEB_AGE_BELOW} AND 
-                    M.OccupationType = 'STUDENT'
-                    AND H.IsDeleted = 0 AND H.ObjectID IN 
+                    M.OccupationType = 'STUDENT' AND 
+                    H.IsDeleted = 0 AND H.ObjectID IN 
                                    (SELECT M1.HouseholdID FROM [Member] M1 
                                     WHERE M1.HouseholdID is NOT NULL 
                                     AND M1.IsDeleted = 0
                                     GROUP BY M1.HouseholdID
-                                    HAVING SUM(M1.AnnualIncome) < {SEB_INCOME_BELOW});
+                                    HAVING SUM(M1.AnnualIncome) < {SEB_INCOME_BELOW})
+                    {searchQuery};
                     ";
                 }
                 else if (grantscheme.ToLower()  == "familytogethernessscheme")
@@ -69,7 +89,8 @@ namespace GrantDisimbursement.Controllers
                     WHERE H.ObjectID IN (
                         SELECT M1.[HouseholdID] FROM [MEMBER] M1 WHERE 
                         M1.[SpouseID] IN (SELECT M2.[OBJECTID] FROM [MEMBER] M2 WHERE M2.[HouseholdID] = M1.[HouseholdID]) AND 
-                        M1.[HouseholdID] IN (SELECT M3.[HouseholdID] FROM [MEMBER] M3 WHERE DATEDIFF(year, M3.DateOfBirth, GETDATE()) < {FTS_AGE_BELOW}));
+                        M1.[HouseholdID] IN (SELECT M3.[HouseholdID] FROM [MEMBER] M3 WHERE DATEDIFF(year, M3.DateOfBirth, GETDATE()) < {FTS_AGE_BELOW}))
+                    {searchQuery};
                     ";
                 }
                 else if (grantscheme.ToLower() == "elderbonus")
@@ -77,7 +98,8 @@ namespace GrantDisimbursement.Controllers
                     sql = $@"
                     SELECT {SELECTORSNIPPET} FROM [Household] H 
                     LEFT JOIN [Member] M ON H.ObjectID = M.HouseholdID
-                    WHERE DATEDIFF(year, M.DateOfBirth, GETDATE()) > {EB_AGE_ABOVE};
+                    WHERE DATEDIFF(year, M.DateOfBirth, GETDATE()) > {EB_AGE_ABOVE}
+                    {searchQuery};
                     ";
                 }
                 else if (grantscheme.ToLower() == "babysunshinegrant")
@@ -85,7 +107,8 @@ namespace GrantDisimbursement.Controllers
                     sql = $@"
                     SELECT {SELECTORSNIPPET} FROM [Household] H 
                     LEFT JOIN [Member] M ON H.ObjectID = M.HouseholdID
-                    WHERE DATEDIFF(year, M.DateOfBirth, GETDATE()) < {BSG_AGE_BELOW};
+                    WHERE DATEDIFF(year, M.DateOfBirth, GETDATE()) < {BSG_AGE_BELOW}
+                    {searchQuery};
                     ";
                 }
                 else if (grantscheme.ToLower() == "yologstgrant")
@@ -97,7 +120,8 @@ namespace GrantDisimbursement.Controllers
                         SELECT M1.HouseholdID FROM [Member] M1 
                         WHERE M1.IsDeleted = 0 
                         GROUP BY M1.HouseholdID
-                        HAVING SUM(M1.AnnualIncome) < {YGG_INCOME_BELOW});
+                        HAVING SUM(M1.AnnualIncome) < {YGG_INCOME_BELOW})
+                    {searchQuery};
                     ";
                 }
                 else
