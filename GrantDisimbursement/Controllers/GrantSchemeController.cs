@@ -26,6 +26,7 @@ namespace GrantDisimbursement.Controllers
                             M.[MaritalStatus], M.[SpouseID], M.[OccupationType],
                             M.[AnnualIncome], M.[DateOfBirth], M.[HouseholdID], M.[IsDeleted] ";
 
+        string[] Schemes = new string[] { "studentencouragementbonus", "familytogethernessscheme", "elderbonus", "babysunshinegrant", "yologstgrant" };
         /// <summary>
         /// Endpoint for querying householdsand receipients of grant disbursement endpoint.
         /// </summary>
@@ -36,11 +37,13 @@ namespace GrantDisimbursement.Controllers
         /// <param name="totalincomelte">total income more than or equals</param>
         /// <returns></returns>
         [HttpGet]
-        [Route("{grantScheme}")]
-        public IHttpActionResult Query(string grantscheme, int? householdsizegte = null, int? householdsizelte = null, int? totalincomegte = null, int? totalincomelte = null)
+        [Route("")]
+        public IHttpActionResult Query(string grantscheme = null, int? householdsizegte = null, int? householdsizelte = null, int? totalincomegte = null, int? totalincomelte = null)
         {
             try
             {
+                #region construct condition based on search parameters
+
                 string HOUSEHOLDSIZEGTE = householdsizegte == null ? "1=1" : $"COUNT(A.HouseholdID) >= {householdsizegte}";
                 string HOUSEHOLDSIZELTE = householdsizegte == null ? "1=1" : $"COUNT(A.HouseholdID) <= {householdsizelte}";
                 string TOTALINCOMEGTE = totalincomegte == null ? "1=1" : $"SUM(A.AnnualIncome) >= {totalincomegte}";
@@ -60,14 +63,15 @@ namespace GrantDisimbursement.Controllers
                                     AND {HOUSEHOLDSIZEGTE} AND {HOUSEHOLDSIZELTE})";
                 }
 
-                string sql = String.Empty;
-                List<HouseholdEntityResponse> householdEntityResponses = new List<HouseholdEntityResponse>();
-                HouseholdEntityResponse householdEntityResponse = new HouseholdEntityResponse();
+                #endregion
 
-                if (grantscheme.ToLower() == "studentencouragementbonus")
+
+                List<string[]> grantSqlsToRun = new List<string[]>();
+
+                if (grantscheme == null || grantscheme.ToLower() == Schemes[0] )
                 {
                     //basic query
-                    sql = $@"
+                    var sql = $@"
                     SELECT {SELECTORSNIPPET} FROM [Household] H 
                     LEFT JOIN [Member] M ON H.ObjectID = M.HouseholdID
                     WHERE DATEDIFF(year, M.DateOfBirth, GETDATE()) < {SEB_AGE_BELOW} AND 
@@ -80,10 +84,12 @@ namespace GrantDisimbursement.Controllers
                                     HAVING SUM(M1.AnnualIncome) < {SEB_INCOME_BELOW})
                     {searchQuery};
                     ";
+                    grantSqlsToRun.Add(new string[] { "Student Encouragement Bonus", sql });
                 }
-                else if (grantscheme.ToLower()  == "familytogethernessscheme")
+                
+                if (grantscheme == null || grantscheme.ToLower()  == Schemes[1])
                 {
-                    sql = $@"
+                    var sql2 = $@"
                     SELECT {SELECTORSNIPPET} FROM [Household] H 
                     LEFT JOIN [Member] M ON H.ObjectID = M.HouseholdID
                     WHERE H.ObjectID IN (
@@ -92,28 +98,34 @@ namespace GrantDisimbursement.Controllers
                         M1.[HouseholdID] IN (SELECT M3.[HouseholdID] FROM [MEMBER] M3 WHERE DATEDIFF(year, M3.DateOfBirth, GETDATE()) < {FTS_AGE_BELOW}))
                     {searchQuery};
                     ";
+                    grantSqlsToRun.Add(new string[] { "Family Togetherness Scheme", sql2 });
                 }
-                else if (grantscheme.ToLower() == "elderbonus")
+                
+                if (grantscheme == null || grantscheme.ToLower() == Schemes[2])
                 {
-                    sql = $@"
+                    var sql3 = $@"
                     SELECT {SELECTORSNIPPET} FROM [Household] H 
                     LEFT JOIN [Member] M ON H.ObjectID = M.HouseholdID
                     WHERE DATEDIFF(year, M.DateOfBirth, GETDATE()) > {EB_AGE_ABOVE}
                     {searchQuery};
                     ";
+                    grantSqlsToRun.Add(new string[] { "Elder Bonus", sql3 });
                 }
-                else if (grantscheme.ToLower() == "babysunshinegrant")
+                
+                if (grantscheme == null || grantscheme.ToLower() == Schemes[3])
                 {
-                    sql = $@"
+                    var sql4 = $@"
                     SELECT {SELECTORSNIPPET} FROM [Household] H 
                     LEFT JOIN [Member] M ON H.ObjectID = M.HouseholdID
                     WHERE DATEDIFF(year, M.DateOfBirth, GETDATE()) < {BSG_AGE_BELOW}
                     {searchQuery};
                     ";
+                    grantSqlsToRun.Add(new string[] { "Baby Sunshine Grant", sql4 });
                 }
-                else if (grantscheme.ToLower() == "yologstgrant")
+                
+                if (grantscheme == null || grantscheme.ToLower() == Schemes[4])
                 {
-                    sql = $@"
+                    var sql5 = $@"
                     SELECT {SELECTORSNIPPET} FROM [Household] H 
                     LEFT JOIN [Member] M ON H.ObjectID = M.HouseholdID
                     WHERE H.OBJECTID IN (
@@ -123,44 +135,58 @@ namespace GrantDisimbursement.Controllers
                         HAVING SUM(M1.AnnualIncome) < {YGG_INCOME_BELOW})
                     {searchQuery};
                     ";
+                    grantSqlsToRun.Add(new string[] { "YOLO GST Grant", sql5 });
                 }
-                else
+                
+                if (grantscheme != null && !Schemes.Contains(grantscheme.ToLower()))
                 {
                     return BadRequest("url parameter grant scheme should be on of 'studentencouragementbonus', 'familytogethernessscheme', 'elderbonus', 'babysunshinegrant', 'yologstgrant'.");
                 }
 
                 SqlCommand command;
                 SqlDataReader dataReader;
-                Guid? tempID = null;
+                
                 // Query Runner
-                using (SqlConnection c = new SqlConnection(ConfigurationManager.AppSettings["database"]))
+                List<GrantScheme> grantSchemes = new List<GrantScheme>();
+               
+                foreach (var grantSQL in grantSqlsToRun)
                 {
-                    command = new SqlCommand(sql, c);
-                    c.Open();
-                    dataReader = command.ExecuteReader();
-
-                    while (dataReader.Read())
+                    List<HouseholdEntityResponse> householdEntityResponses = new List<HouseholdEntityResponse>();
+                    HouseholdEntityResponse householdEntityResponse = new HouseholdEntityResponse();
+                    Guid? tempID = null;
+                    var grantScheme = new GrantScheme() { GrantSchemeName = grantSQL[0] };
+                    using (SqlConnection c = new SqlConnection(ConfigurationManager.AppSettings["database"]))
                     {
-                        var household = Helpers.ReadHouseholdRow((IDataRecord)dataReader);
-                        if (tempID != household.ObjectID)
+                        command = new SqlCommand(grantSQL[1], c);
+                        c.Open();
+                        dataReader = command.ExecuteReader();
+
+                        while (dataReader.Read())
                         {
-                            if (tempID != null)
+                            var household = Helpers.ReadHouseholdRow((IDataRecord)dataReader);
+                            if (tempID != household.ObjectID)
                             {
-                                //add the householdentityResponse to list
-                                householdEntityResponses.Add(householdEntityResponse);
+                                if (tempID != null)
+                                {
+                                    //add the householdentityResponse to list
+                                    householdEntityResponses.Add(householdEntityResponse);
+                                }
+                                householdEntityResponse = new HouseholdEntityResponse();
+                                householdEntityResponse.Household = household;
+                                householdEntityResponse.FamilyMembers = new List<Member>();
+                                tempID = household.ObjectID.Value;
                             }
-                            householdEntityResponse = new HouseholdEntityResponse();
-                            householdEntityResponse.Household = household;
-                            householdEntityResponse.FamilyMembers = new List<Member>();
-                            tempID = household.ObjectID.Value;
+                            var familyMember = Helpers.ReadMemberRow((IDataRecord)dataReader, 3);
+                            householdEntityResponse.FamilyMembers.Add(familyMember);
                         }
-                        var familyMember = Helpers.ReadMemberRow((IDataRecord)dataReader, 3);
-                        householdEntityResponse.FamilyMembers.Add(familyMember);
+                        // end of query result, add last result into list.
+                        householdEntityResponses.Add(householdEntityResponse);
+
                     }
-                    // end of query result, add last result into list.
-                    householdEntityResponses.Add(householdEntityResponse);
+                    grantScheme.HouseholdEntity = householdEntityResponses;
+                    grantSchemes.Add(grantScheme);
                 }
-                return Ok(householdEntityResponses);
+                return Ok(grantSchemes);
             }
             catch (Exception ex)
             {
