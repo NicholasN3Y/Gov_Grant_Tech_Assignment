@@ -20,7 +20,8 @@ namespace GrantDisimbursement.Models
         public Decimal? AnnualIncome { get; set; }
         public DateTime? DateOfBirth { get; set; }
 
-        //Foreign Key to that of Household table
+        //Foreign Key which is ObjectID of Household table
         public Guid? HouseholdID { get; set; }
+        public int? IsDeleted { get; set; }
     }
 }
