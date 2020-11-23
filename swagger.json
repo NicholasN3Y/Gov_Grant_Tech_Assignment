@@ -1,0 +1,279 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "version": "v1",
+    "title": "Grant Disimbursement API"
+  },
+  "host": "localhost",
+  "basePath": "/GrantDisimbursement",
+  "schemes": [
+    "http"
+  ],
+  "paths": {
+    "/api/GrantScheme": {
+      "get": {
+        "tags": [
+          "GrantScheme"
+        ],
+        "summary": "Endpoint for querying householdsand receipients of grant disbursement endpoint.",
+        "operationId": "GrantScheme_Query",
+        "consumes": [],
+        "produces": [
+          "application/json",
+          "text/json",
+          "application/xml",
+          "text/xml"
+        ],
+        "parameters": [
+          {
+            "name": "grantscheme",
+            "in": "query",
+            "description": "grant schemes",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "householdsizegte",
+            "in": "query",
+            "description": "household size greater than or equals",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "householdsizelte",
+            "in": "query",
+            "description": "household size less  than or equals",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "totalincomegte",
+            "in": "query",
+            "description": "total income less than or equals",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "totalincomelte",
+            "in": "query",
+            "description": "total income more than or equals",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "object"
+            }
+          }
+        }
+      }
+    },
+    "/api/Household": {
+      "get": {
+        "tags": [
+          "Household"
+        ],
+        "summary": "Gets all household listings",
+        "operationId": "Household_GetHouseHoldsListings",
+        "consumes": [],
+        "produces": [
+          "application/json",
+          "text/json",
+          "application/xml",
+          "text/xml"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "object"
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Household"
+        ],
+        "summary": "Creates the household (housing unit)",
+        "operationId": "Household_CreateHousehold",
+        "consumes": [],
+        "produces": [
+          "application/json",
+          "text/json",
+          "application/xml",
+          "text/xml"
+        ],
+        "parameters": [
+          {
+            "name": "housingType",
+            "in": "query",
+            "description": "possible options: Landed, Condominium, HDB",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "object"
+            }
+          }
+        }
+      }
+    },
+    "/api/Household/{householdID}": {
+      "get": {
+        "tags": [
+          "Household"
+        ],
+        "summary": "Retrieves a specific  household",
+        "operationId": "Household_RetrieveHousehold",
+        "consumes": [],
+        "produces": [
+          "application/json",
+          "text/json",
+          "application/xml",
+          "text/xml"
+        ],
+        "parameters": [
+          {
+            "name": "householdID",
+            "in": "path",
+            "description": "the identifier of the household",
+            "required": true,
+            "type": "string",
+            "format": "uuid"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "object"
+            }
+          }
+        }
+      }
+    },
+    "/api/HouseholdMember": {
+      "post": {
+        "tags": [
+          "HouseholdMember"
+        ],
+        "summary": "Addes a Family Member to the Household",
+        "operationId": "HouseholdMember_AddFamilyMemberToHousehold",
+        "consumes": [
+          "application/json",
+          "text/json",
+          "application/xml",
+          "text/xml",
+          "application/x-www-form-urlencoded"
+        ],
+        "produces": [
+          "application/json",
+          "text/json",
+          "application/xml",
+          "text/xml"
+        ],
+        "parameters": [
+          {
+            "name": "familyMember",
+            "in": "body",
+            "description": "",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/Member"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "object"
+            }
+          }
+        }
+      }
+    },
+    "/api/testConnection": {
+      "get": {
+        "tags": [
+          "Sample"
+        ],
+        "operationId": "Sample_TestConnection",
+        "consumes": [],
+        "produces": [
+          "application/json",
+          "text/json",
+          "application/xml",
+          "text/xml"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "object"
+            }
+          }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "Member": {
+      "type": "object",
+      "properties": {
+        "ObjectID": {
+          "format": "uuid",
+          "type": "string",
+          "example": "00000000-0000-0000-0000-000000000000"
+        },
+        "Name": {
+          "type": "string"
+        },
+        "Gender": {
+          "type": "string"
+        },
+        "MaritalStatus": {
+          "type": "string"
+        },
+        "SpouseID": {
+          "format": "uuid",
+          "type": "string",
+          "example": "00000000-0000-0000-0000-000000000000"
+        },
+        "OccupationType": {
+          "description": "either of Unemployed, Student, Employed",
+          "type": "string"
+        },
+        "AnnualIncome": {
+          "format": "double",
+          "type": "number"
+        },
+        "DateOfBirth": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "HouseholdID": {
+          "format": "uuid",
+          "type": "string",
+          "example": "00000000-0000-0000-0000-000000000000"
+        },
+        "IsDeleted": {
+          "format": "int32",
+          "type": "integer"
+        }
+      }
+    }
+  }
+}
