@@ -8,8 +8,9 @@ Backend DB : Microsoft SQL Server
 
 1) Spin up a MSSQLServer on port 60666 on Docker on Windows running with WSL2 by using the Dockerfile by calling the below commands:
 
-docker build -t nicholasmssql .
-docker run -d -p 60666:1433 --name nicholasInstance nicholasmssql
+```docker build -t nicholasmssql .```
+
+```docker run -d -p 60666:1433 --name nicholasInstance nicholasmssql```
 
 2) Connect to DB using Azure Data Studio or any other tool on localhost,60666
 
